@@ -8,6 +8,8 @@ from sqlalchemy import create_engine, func
 
 from flask import Flask, jsonify
 
+import datetime as dt
+
 #################################################
 # Database Setup
 #################################################
@@ -38,7 +40,9 @@ def welcome():
     return (
         f"Available Routes:<br/>"
         f"/api/v1.0/precipitation<br/>"
-        f"/api/v1.0/stations"
+        f"/api/v1.0/stations<br/>"
+        f"/api/v1.0/tobs<br/>"
+        f"/api/v1.0/start  Type start date using YYYY-MM-DD format"
     )
     
 @app.route("/api/v1.0/precipitation")
@@ -61,16 +65,13 @@ def precipitation():
     return jsonify(precipitation_json)
 
 
-########
-##NOT WORKING
-#######
 @app.route("/api/v1.0/stations")
 def stations():
     # Create our session (link) from Python to the DB
     session = Session(engine)
     
     # Query data from last twelve months
-    results = session.query(Sta.station).all()
+    results = session.query(Sta.station, Sta.name, Sta.latitude, Sta.longitude, Sta.elevation).all()
 
     session.close()
     
@@ -79,13 +80,62 @@ def stations():
     for station, name, latitude, longitude, elevation in results:
         station_dict = {}
         station_dict["station"] = station
-        station_dict['name'] = name
-        # station_dict["latitude"] = latitude
-        # station_dict["longitude"] = longitude
-        # station_dict["elevation"] = elevation
+        station_dict["name"] = name
+        station_dict["latitude"] = latitude
+        station_dict["longitude"] = longitude
+        station_dict["elevation"] = elevation
         station_json.append(station_dict)
 
     return jsonify(station_json)
+
+
+@app.route("/api/v1.0/tobs")
+def temps():
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+    
+    # Query data from last twelve months
+    last_row = session.query(Mmt.date).order_by(Mmt.date.desc()).first()
+    last_date = dt.date.fromisoformat(last_row[0])
+    query_date = last_date - dt.timedelta(days=365)
+    results = session.query(Mmt.date, Mmt.tobs, Mmt.station).filter(Mmt.station == "USC00519281").filter(Mmt.date >= query_date).all()
+
+    session.close()
+    
+    # Create a dictionary from the row data and append to a list of all precipitation values
+    tobs_json = []
+    for date, tobs, station in results:
+        tobs_dict = {}
+        tobs_dict["station"] = station        
+        tobs_dict[date] = tobs
+        tobs_json.append(tobs_dict)
+
+    return jsonify(tobs_json)
+
+
+@app.route("/api/v1.0/<start>")
+def temps_start(start):
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+    
+    # Edit possible formatting variations
+    corrected_start = start.replace("/","-").replace(" ","")
+    
+    # Create a dictionary from the row data and append to a list of all precipitation values
+    
+    #######################################################
+    ###NOT WORKING. JSON IS NOT SERIALIZABLE
+    #######################################################
+    tobs_json = []
+    tmin = session.query(Mmt.date, Mmt.tobs).filter(Mmt.date >= corrected_start).order_by(Mmt.tobs).first()
+    tavg = session.query(Mmt.date, func.avg(Mmt.tobs)).filter(Mmt.date >= corrected_start).first()
+    tmax = session.query(Mmt.date, Mmt.tobs).filter(Mmt.date >= corrected_start).order_by(Mmt.tobs.desc()).first()
+    tobs_dict = {"TMIN":tmin, "TAVG":tavg, "TMAX":tmax}
+    tobs_json.append(tobs_dict)
+
+    return jsonify(tobs_json)
+
+    session.close()
 
 
 if __name__ == '__main__':
