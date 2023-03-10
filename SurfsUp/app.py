@@ -121,19 +121,21 @@ def temps_start(start):
     # Edit possible formatting variations
     corrected_start = start.replace("/","-").replace(" ","")
     
-    # Create a dictionary from the row data and append to a list of all precipitation values
-    
-    #######################################################
-    ###NOT WORKING. JSON IS NOT SERIALIZABLE
-    #######################################################
-    tobs_json = []
-    tmin = session.query(Mmt.date, Mmt.tobs).filter(Mmt.date >= corrected_start).order_by(Mmt.tobs).first()
-    tavg = session.query(Mmt.date, func.avg(Mmt.tobs)).filter(Mmt.date >= corrected_start).first()
-    tmax = session.query(Mmt.date, Mmt.tobs).filter(Mmt.date >= corrected_start).order_by(Mmt.tobs.desc()).first()
-    tobs_dict = {"TMIN":tmin, "TAVG":tavg, "TMAX":tmax}
-    tobs_json.append(tobs_dict)
+    # Query all temps
+    temps = session.query(Mmt.date, Mmt.tobs).filter(Mmt.date >= corrected_start).all()
 
-    return jsonify(tobs_json)
+    tmin = session.query(Mmt.date, func.min(Mmt.tobs)).filter(Mmt.date >= corrected_start).all()
+    tmax = session.query(Mmt.date, func.max(Mmt.tobs)).filter(Mmt.date >= corrected_start).all()
+    tavg = session.query(Mmt.date, func.avg(Mmt.tobs)).filter(Mmt.date >= corrected_start).all()
+    
+    return jsonify(tmin, tmax, tavg)
+    
+    # tavg = session.query(Mmt.date, func.avg(Mmt.tobs)).filter(Mmt.date >= corrected_start).first()
+    # tmax = session.query(Mmt.date, Mmt.tobs).filter(Mmt.date >= corrected_start).order_by(Mmt.tobs.desc()).first()
+    # tobs_dict = {"TMIN":tmin, "TAVG":tavg, "TMAX":tmax}
+    # tobs_json.append(tobs_dict)
+
+    # return jsonify(tobs_json)
 
     session.close()
 
